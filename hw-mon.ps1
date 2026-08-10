@@ -86,61 +86,10 @@ foreach ($d in $disks) {
     $d | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue | ForEach-Object {
         if ($_.Wear) { KV '  SSD Wear' ('{0:N1} %' -f $_.Wear) }
         if ($_.Temperature) { KV '  Temp' ('{0:N0} C' -f $_.Temperature) }
+        if ($_.PowerOnHours) { KV '  Power-On Hours' ('{0:n0} jam ({1} hari)' -f $_.PowerOnHours, [int]($_.PowerOnHours/24)) }
         KV '  Read Errors' $_.ReadErrorsTotal
         KV '  Write Errors' $_.WriteErrorsTotal
     }
-}
-# Power-on hours via smartctl if present
-$sc = Get-Command smartctl -ErrorAction SilentlyContinue
-if (-not $sc) {
-    $p = 'C:\Program Files\smartmontools\bin\smartctl.exe'
-    if (Test-Path $p) { $sc = Get-Item $p }
-}
-if ($sc) {
-    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    if (-not $isAdmin) {
-        KV 'POH (smartctl)' 'smartctl terpasang - buka cmd as Administrator untuk baca POH NVMe'
-    } else {
-        KV 'POH (smartctl)' 'detected - parsing...'
-        try {
-        $scanOut = (& $sc.FullName --scan-open 2>$null | Out-String) -split "`r?`n" | Where-Object { $_ -match '\S' }
-        $devs = @()
-        foreach ($line in $scanOut) {
-            $dm = [regex]::Match($line, '^\s*(\S+)\s+(-d\s+\S+)\s+#')
-            if ($dm.Success) { $devs += ,@($dm.Groups[2].Value, $dm.Groups[1].Value) }
-        }
-        if ($devs.Count -eq 0) { $devs += ,@('') }
-        foreach ($spec in $devs) {
-            $darg = $spec[0]
-            if ($darg) { $darg = @($darg -split ' ') } else { $darg = @() }
-            $dev  = if ($spec.Count -gt 1) { $spec[1] } else { $null }
-            $callArgs = @($darg)
-            if ($dev) { $callArgs += @('-a', $dev) }
-            $raw = (& $sc.FullName @($callArgs) 2>&1 | Out-String)
-            $h = $null
-            foreach ($m in [regex]::Matches($raw, '(?m)^\s*Power[_ ]On[_ ]Hours\s*:\s*([\d,]+)\s*$')) {
-                $h = [int64]($m.Groups[1].Value -replace ',','')
-                break
-            }
-            if ($null -eq $h) {
-                foreach ($m in [regex]::Matches($raw, '(?m)^Power_On_Hours\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S\s+([\d,]+)\s*$')) {
-                    $h = [int64]($m.Groups[1].Value -replace ',','')
-                    break
-                }
-            }
-            $modelM = [regex]::Match($raw, '(?m)^\s*Model Number:\s*(.+)$')
-            $diskModel = if ($modelM.Success) { $modelM.Groups[1].Value.Trim() } else { $dev }
-            if ($null -ne $h) { KV ("  POH '{0}'" -f $diskModel) ('{0:n0} jam ({1} hari)' -f $h, [int]($h/24)) }
-            else {
-                $rawLines = ($raw -split "`r?`n") | Where-Object { $_ -match 'Power[_ ]On[_ ]Hours' }
-                if ($rawLines) { $rawLines | ForEach-Object { KV ("  POH '{0}'" -f $diskModel) $_.Trim() } }
-                else { KV ("  POH '{0}'" -f $diskModel) 'tak terbaca' }
-            }
-        }
-        } catch { KV 'POH (smartctl)' ('gagal dibaca: ' + $_.Exception.Message) }
-    }
-} else {
-    KV 'POH (smartctl)' 'smartctl tidak terdeteksi - install smartmontools untuk POH'
 }
 
 # ---------- Battery ----------
