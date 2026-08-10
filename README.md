@@ -8,7 +8,11 @@ Menampilkan: spesifikasi sistem, CPU, RAM, GPU, storage (termasuk health/wear), 
 
 ### Jalankan Online (Zero-Install)
 
-Paling cepat. **Copy baris ini, paste di terminal (cmd ATAU PowerShell), Enter:**
+Paling cepat — **auto jalankan sebagai Administrator** (keluar UAC prompt sekali di klik OK), tanpa clone, tanpa install apa pun.
+
+**Cara A — pakai file runner:** download [`hw-mon-online.cmd`](https://raw.githubusercontent.com/agusedyc/hw-mon/main/hw-mon-online.cmd) (klik kanan → *Save link as*), simpan di mana pun, lalu **double-click**. Window baru terbuka, isi UAC, selesai.
+
+**Cara B — copy-paste di terminal (cmd ATAU PowerShell), Enter:**
 
 ```
 curl.exe -Ls https://raw.githubusercontent.com/agusedyc/hw-mon/main/hw-mon.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
@@ -18,7 +22,7 @@ curl.exe -Ls https://raw.githubusercontent.com/agusedyc/hw-mon/main/hw-mon.ps1 |
 - Bisa dijalankan dari cmd klasik maupun PowerShell window — baris yang sama.
 - Semua section jalan: sistem, CPU, RAM, GPU, storage, battery.
 
-**Butuh POH (Power-On Hours) SSD/HDD NVMe?** Buka prompt **as Administrator** (klik kanan CMD → *Run as administrator*), lalu paste ulang baris di atas. Kalau `smartctl` belum terpasang, script akan lapor dan mengarahkan cara installnya.
+**Bagian yang butuh Administrator (POH SSD/HDD NVMe):** cara A otomatis elevate → bisa membaca power-on hours langsung. Cara B kalau mau POH, buka prompt **as Administrator** (klik kanan → *Run as administrator*) lalu paste ulang baris di atas. Semua section lain tetap jalan tanpa admin.
 
 > ⚠️ Perhatian: menjalankan kode dari internet tanpa meninjaunya lebih dulu berisiko. Kalau mau paling aman, gunakan cara clone di bawah — baca kodenya dulu, lalu jalankan.
 
@@ -135,7 +139,8 @@ BATTERY
 
 ```
 hw-mon/
-├── hw-mon.ps1    # script utama
-├── hw-mon.cmd    # wrapper — auto-install smartctl + jalankan
+├── hw-mon.ps1           # script utama
+├── hw-mon.cmd           # wrapper — auto-install smartctl + jalankan
+├── hw-mon-online.cmd    # zero-install runner — auto-admin + jalankan online
 └── README.md
 ```
