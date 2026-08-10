@@ -102,16 +102,24 @@ if ($sc) {
         KV 'POH (smartctl)' 'smartctl terpasang - buka cmd as Administrator untuk baca POH NVMe'
     } else {
         KV 'POH (smartctl)' 'detected - parsing...'
+        try {
         Get-CimInstance Win32_DiskDrive | ForEach-Object {
             $raw = & $sc.FullName -a $_.DeviceID 2>$null | Out-String
-            $found = $false
-            foreach ($mm in [regex]::Matches($raw, 'Power[_ ]On[_ ]Hours\s+[\d\s]*[-+]?(\d+)')) {
-                $h = [int64]$mm.Groups[1].Value
-                KV ("  POH '{0}'" -f $_.Model) ('{0:n0} jam ({1} hari)' -f $h, [int]($h/24))
-                $found = $true
+            $h = $null
+            foreach ($m in [regex]::Matches($raw, '(?m)^\s*Power[_ ]On[_ ]Hours\s*:\s*([\d,]+)\s*$')) {
+                $h = [int64]($m.Groups[1].Value -replace ',','')
+                break
             }
-            if (-not $found) { KV ("  POH '{0}'" -f $_.Model) 'tak terbaca' }
+            if ($null -eq $h) {
+                foreach ($m in [regex]::Matches($raw, '(?m)^Power_On_Hours\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S\s+([\d,]+)\s*$')) {
+                    $h = [int64]($m.Groups[1].Value -replace ',','')
+                    break
+                }
+            }
+            if ($null -ne $h) { KV ("  POH '{0}'" -f $_.Model) ('{0:n0} jam ({1} hari)' -f $h, [int]($h/24)) }
+            else { KV ("  POH '{0}'" -f $_.Model) 'tak terbaca' }
         }
+        } catch { KV 'POH (smartctl)' ('gagal dibaca: ' + $_.Exception.Message) }
     }
 } else {
     KV 'POH (smartctl)' 'smartctl tidak terdeteksi - install smartmontools untuk POH'
@@ -165,4 +173,6 @@ if ($bat) {
 
 Write-Host ''
 Write-Host 'Selesai.' -ForegroundColor DarkGray
+
+Read-Host 'Tekan Enter untuk menutup...'
 
