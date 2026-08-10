@@ -103,8 +103,20 @@ if ($sc) {
     } else {
         KV 'POH (smartctl)' 'detected - parsing...'
         try {
-        Get-CimInstance Win32_DiskDrive | ForEach-Object {
-            $raw = & $sc.FullName -a $_.DeviceID 2>$null | Out-String
+        $scanOut = (& $sc.FullName --scan-open 2>$null | Out-String) -split "`r?`n" | Where-Object { $_ -match '\S' }
+        $devs = @()
+        foreach ($line in $scanOut) {
+            $dm = [regex]::Match($line, '^\s*(\S+)\s+(-d\s+\S+)\s+#')
+            if ($dm.Success) { $devs += ,@($dm.Groups[2].Value, $dm.Groups[1].Value) }
+        }
+        if ($devs.Count -eq 0) { $devs += ,@('') }
+        foreach ($spec in $devs) {
+            $darg = $spec[0]
+            if ($darg) { $darg = @($darg -split ' ') } else { $darg = @() }
+            $dev  = if ($spec.Count -gt 1) { $spec[1] } else { $null }
+            $callArgs = @($darg)
+            if ($dev) { $callArgs += @('-a', $dev) }
+            $raw = (& $sc.FullName @($callArgs) 2>&1 | Out-String)
             $h = $null
             foreach ($m in [regex]::Matches($raw, '(?m)^\s*Power[_ ]On[_ ]Hours\s*:\s*([\d,]+)\s*$')) {
                 $h = [int64]($m.Groups[1].Value -replace ',','')
@@ -116,8 +128,14 @@ if ($sc) {
                     break
                 }
             }
-            if ($null -ne $h) { KV ("  POH '{0}'" -f $_.Model) ('{0:n0} jam ({1} hari)' -f $h, [int]($h/24)) }
-            else { KV ("  POH '{0}'" -f $_.Model) 'tak terbaca' }
+            $modelM = [regex]::Match($raw, '(?m)^\s*Model Number:\s*(.+)$')
+            $diskModel = if ($modelM.Success) { $modelM.Groups[1].Value.Trim() } else { $dev }
+            if ($null -ne $h) { KV ("  POH '{0}'" -f $diskModel) ('{0:n0} jam ({1} hari)' -f $h, [int]($h/24)) }
+            else {
+                $rawLines = ($raw -split "`r?`n") | Where-Object { $_ -match 'Power[_ ]On[_ ]Hours' }
+                if ($rawLines) { $rawLines | ForEach-Object { KV ("  POH '{0}'" -f $diskModel) $_.Trim() } }
+                else { KV ("  POH '{0}'" -f $diskModel) 'tak terbaca' }
+            }
         }
         } catch { KV 'POH (smartctl)' ('gagal dibaca: ' + $_.Exception.Message) }
     }
