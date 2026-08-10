@@ -1,5 +1,15 @@
 #Requires -Version 5.1
 $ErrorActionPreference = 'Stop'
+
+# Auto-elevate to Administrator
+$id = [Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    $tmp = Join-Path $env:TEMP ('hw-mon-' + [guid]::NewGuid().ToString('N') + '.ps1')
+    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/agusedyc/hw-mon/main/hw-mon.ps1' -OutFile $tmp -UseBasicParsing
+    Start-Process powershell.exe -Verb RunAs -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File', ('"' + $tmp + '"'))
+    exit
+}
+
 $wce = $host.UI.RawUI.WindowSize.Width
 if (-not $wce -or $wce -lt 40) { $wce = 100 }
 
